@@ -25,11 +25,11 @@
 
 ### 1.1 订阅计划
 
-| 计划 | 月付价格 | 年付价格 | 核心功能 |
-|------|---------|---------|---------|
-| **Free** | $0 | $0 | 资金费率套利、20 API/min、2 交易所 |
-| **Pro** | $19.9 | $191 | 所有套利、100 API/min、5 交易所、回测 |
-| **Ultra** | $39.9 | $383 | 全部功能、300 API/min、无限制、模拟盘 |
+| 计划            | 月付价格     | 年付价格                              | 核心功能 |
+| --------------- | ------------ | ------------------------------------- | -------- |
+| **Free**  | $0 | $0      | 资金费率套利、20 API/min、2 交易所    |          |
+| **Pro**   | $19.9 | $191 | 所有套利、100 API/min、5 交易所、回测 |          |
+| **Ultra** | $39.9 | $383 | 全部功能、300 API/min、无限制、模拟盘 |          |
 
 ### 1.2 技术架构
 
@@ -134,7 +134,7 @@ POST /api/subscription/checkout
 
 Body:
 {
-  "priceId": "price_xxxxxxxxxxxxx",     // Stripe Price ID
+  "priceId": "price_XXXXXXXXXXXXXXXX",     // Stripe Price ID (脱敏占位符)
   "billingCycle": "monthly" | "yearly"  // 计费周期
 }
 ```
@@ -142,14 +142,16 @@ Body:
 #### 响应格式
 
 **成功响应 (200)**:
+
 ```json
 {
-  "url": "https://checkout.stripe.com/c/pay/cs_xxx",
-  "sessionId": "cs_xxxxxxxxxxxxxxxxxxxxx"
+  "url": "https://checkout.stripe.com/c/pay/cs_XXXXXXXXXXXXXXXX",
+  "sessionId": "cs_XXXXXXXXXXXXXXXXXXXXXXXX"
 }
 ```
 
 **错误响应 (400/401/500)**:
+
 ```json
 {
   "error": "Error message",
@@ -235,6 +237,7 @@ const { data: existingSubscription } = await supabase
 #### Step 5: 创建 Checkout Session
 
 **新订阅场景**:
+
 ```typescript
 const session = await stripe.checkout.sessions.create({
   mode: 'subscription',
@@ -256,6 +259,7 @@ const session = await stripe.checkout.sessions.create({
 ```
 
 **升级/降级订阅场景**:
+
 ```typescript
 // 如果已有活跃订阅，直接更新订阅而非创建新订阅
 if (existingSubscription && existingSubscription.status === 'active') {
@@ -298,13 +302,13 @@ if (!existingSubscription || existingSubscription.status !== 'active') {
 
 ### 3.1 关键 Webhook 事件
 
-| 事件类型 | 触发时机 | 处理逻辑 |
-|---------|---------|---------|
-| `checkout.session.completed` | 用户完成支付 | 激活订阅，更新数据库状态为 `active` |
-| `customer.subscription.updated` | 订阅升级/降级/续费 | 更新订阅计划和周期信息 |
-| `customer.subscription.deleted` | 订阅取消/过期 | 更新状态为 `canceled`，降级到 Free |
-| `invoice.payment_succeeded` | 续费成功 | 更新 `current_period_end`，重置配额 |
-| `invoice.payment_failed` | 续费失败 | 更新状态为 `past_due`，发送邮件提醒 |
+| 事件类型                          | 触发时机           | 处理逻辑                              |
+| --------------------------------- | ------------------ | ------------------------------------- |
+| `checkout.session.completed`    | 用户完成支付       | 激活订阅，更新数据库状态为 `active` |
+| `customer.subscription.updated` | 订阅升级/降级/续费 | 更新订阅计划和周期信息                |
+| `customer.subscription.deleted` | 订阅取消/过期      | 更新状态为 `canceled`，降级到 Free  |
+| `invoice.payment_succeeded`     | 续费成功           | 更新 `current_period_end`，重置配额 |
+| `invoice.payment_failed`        | 续费失败           | 更新状态为 `past_due`，发送邮件提醒 |
 
 ### 3.2 Webhook 处理架构
 
@@ -381,6 +385,7 @@ try {
 **触发时机**: 用户完成支付后
 
 **处理逻辑**:
+
 ```typescript
 async function handleCheckoutCompleted(event: Stripe.Event) {
   const session = event.data.object as Stripe.Checkout.Session;
@@ -439,6 +444,7 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
 **触发时机**: 订阅升级/降级/续费
 
 **处理逻辑**:
+
 ```typescript
 async function handleSubscriptionUpdated(event: Stripe.Event) {
   const subscription = event.data.object as Stripe.Subscription;
@@ -484,6 +490,7 @@ async function handleSubscriptionUpdated(event: Stripe.Event) {
 **触发时机**: 订阅取消或过期
 
 **处理逻辑**:
+
 ```typescript
 async function handleSubscriptionDeleted(event: Stripe.Event) {
   const subscription = event.data.object as Stripe.Subscription;
@@ -529,6 +536,7 @@ async function handleSubscriptionDeleted(event: Stripe.Event) {
 **触发时机**: 续费成功
 
 **处理逻辑**:
+
 ```typescript
 async function handleInvoicePaymentSucceeded(event: Stripe.Event) {
   const invoice = event.data.object as Stripe.Invoice;
@@ -560,6 +568,7 @@ async function handleInvoicePaymentSucceeded(event: Stripe.Event) {
 **触发时机**: 续费失败
 
 **处理逻辑**:
+
 ```typescript
 async function handleInvoicePaymentFailed(event: Stripe.Event) {
   const invoice = event.data.object as Stripe.Invoice;
@@ -597,6 +606,7 @@ async function handleInvoicePaymentFailed(event: Stripe.Event) {
 **场景**: 用户从 Free 升级到 Pro/Ultra
 
 **流程**:
+
 ```typescript
 // 用户点击「立即升级」
 POST /api/subscription/checkout
@@ -613,12 +623,13 @@ Webhook: checkout.session.completed
 ```
 
 **数据库操作**:
+
 ```sql
 -- 创建初始记录（checkout API）
 INSERT INTO user_subscriptions (
   user_id, status, stripe_subscription_id, billing_cycle
 ) VALUES (
-  'user-uuid', 'incomplete', 'sub_xxxxx', 'monthly'
+  'user-uuid', 'incomplete', 'sub_XXXXXXXXXXXXXXXX', 'monthly'
 );
 
 -- 激活订阅（webhook）
@@ -626,10 +637,10 @@ UPDATE user_subscriptions
 SET
   status = 'active',
   plan_id = 'pro-plan-uuid',
-  stripe_customer_id = 'cus_xxxxx',
+  stripe_customer_id = 'cus_XXXXXXXXXXXXXXXX',
   current_period_start = '2026-02-12',
   current_period_end = '2026-03-12'
-WHERE stripe_subscription_id = 'sub_xxxxx';
+WHERE stripe_subscription_id = 'sub_XXXXXXXXXXXXXXXX';
 ```
 
 ### 4.2 升级订阅（Pro → Ultra）
@@ -637,6 +648,7 @@ WHERE stripe_subscription_id = 'sub_xxxxx';
 **场景**: 用户从 Pro 升级到 Ultra
 
 **流程**:
+
 ```typescript
 // 用户点击「升级到 Ultra」
 调用 Stripe API 直接更新订阅（无需 Checkout）
@@ -654,6 +666,7 @@ Webhook: customer.subscription.updated
 ```
 
 **按比例计费逻辑**:
+
 - 假设用户在 Pro 月付的第 15 天升级到 Ultra：
   - 已使用 Pro: 15 天 × $19.9 / 30 天 = $9.95
   - 未使用 Pro: 15 天 × $19.9 / 30 天 = $9.95（退款到余额）
@@ -665,6 +678,7 @@ Webhook: customer.subscription.updated
 **场景**: 用户从 Ultra 降级到 Pro
 
 **流程**:
+
 ```typescript
 // 用户点击「降级到 Pro」
 调用 Stripe API 更新订阅（账期结束后生效）
@@ -684,6 +698,7 @@ Webhook: customer.subscription.updated（在账期结束时触发）
 ```
 
 **推荐策略**:
+
 - 立即降级：使用 `proration_behavior: 'create_prorations'`（按比例退款）
 - 账期结束后降级：使用 `proration_behavior: 'none'`（用户体验更好）
 
@@ -717,6 +732,7 @@ await stripe.subscriptions.update(subscriptionId, {
 ```
 
 **前端提示**:
+
 ```typescript
 if (subscription.cancel_at_period_end) {
   return (
@@ -734,6 +750,7 @@ if (subscription.cancel_at_period_end) {
 **场景**: 订阅到期且未续费
 
 **流程**:
+
 ```
 账期结束 (current_period_end)
   ↓
@@ -763,6 +780,7 @@ Stripe 尝试扣款（自动续费）
 ```
 
 **Stripe 重试策略**:
+
 - 第 1 次失败: 3 天后重试
 - 第 2 次失败: 5 天后重试
 - 第 3 次失败: 7 天后重试
@@ -775,11 +793,13 @@ Stripe 尝试扣款（自动续费）
 ### 5.1 为什么需要幂等性？
 
 **问题场景**:
+
 - Webhook 重复发送（网络重试）
 - 并发请求处理同一事件
 - 系统故障后重新处理
 
 **后果**:
+
 - 订阅状态错误（如 Free 用户被重复激活）
 - 配额计数错误
 - 数据库数据不一致
@@ -789,6 +809,7 @@ Stripe 尝试扣款（自动续费）
 #### 方案 1: 数据库唯一约束 + Event Log
 
 **创建事件日志表**:
+
 ```sql
 CREATE TABLE IF NOT EXISTS public.stripe_webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -810,6 +831,7 @@ CREATE INDEX idx_stripe_webhook_events_status
 ```
 
 **幂等性检查逻辑**:
+
 ```typescript
 async function processWebhookEvent(event: Stripe.Event) {
   const { id: eventId, type: eventType, data } = event;
@@ -869,6 +891,7 @@ async function processWebhookEvent(event: Stripe.Event) {
 #### 方案 2: 数据库事务 + UPSERT
 
 **使用 UPSERT 避免重复插入**:
+
 ```typescript
 // Stripe 订阅 ID 是唯一的，使用 UPSERT 保证幂等性
 await supabase
@@ -887,6 +910,7 @@ await supabase
 ### 5.3 幂等性测试
 
 **测试用例**:
+
 ```typescript
 // 测试 1: 重复发送相同 Webhook
 async function testDuplicateWebhook() {
@@ -918,23 +942,25 @@ async function testDuplicateWebhook() {
 
 ### 6.1 错误分类
 
-| 错误类型 | 严重程度 | 处理策略 |
-|---------|---------|---------|
-| **网络超时** | 低 | Stripe 自动重试（最多 3 次） |
-| **签名验证失败** | 高 | 返回 400，记录日志，发送告警 |
-| **数据库错误** | 高 | 返回 500，Stripe 重试，发送告警 |
-| **事件处理失败** | 中 | 标记为 failed，人工介入 |
-| **支付失败** | 中 | 发送邮件通知用户 |
+| 错误类型               | 严重程度 | 处理策略                        |
+| ---------------------- | -------- | ------------------------------- |
+| **网络超时**     | 低       | Stripe 自动重试（最多 3 次）    |
+| **签名验证失败** | 高       | 返回 400，记录日志，发送告警    |
+| **数据库错误**   | 高       | 返回 500，Stripe 重试，发送告警 |
+| **事件处理失败** | 中       | 标记为 failed，人工介入         |
+| **支付失败**     | 中       | 发送邮件通知用户                |
 
 ### 6.2 Webhook 重试机制
 
 **Stripe 重试策略**:
+
 - 初次失败: 立即重试 1 次
 - 如果仍失败: 1 小时后重试
 - 继续失败: 每隔 2 小时重试一次
 - 最多重试 24 小时
 
 **前端容错**:
+
 ```typescript
 // 订阅状态同步延迟的处理
 export function useSubscription() {
@@ -970,6 +996,7 @@ export function useSubscription() {
 ### 6.3 支付失败处理
 
 **发送邮件通知**:
+
 ```typescript
 async function sendPaymentFailedEmail(userId: string) {
   const { data: user } = await supabase
@@ -996,6 +1023,7 @@ async function sendPaymentFailedEmail(userId: string) {
 ```
 
 **前端提示**:
+
 ```typescript
 if (subscription.status === 'past_due') {
   return (
@@ -1018,6 +1046,7 @@ if (subscription.status === 'past_due') {
 ### 6.4 降级策略
 
 **配额超限时的降级处理**:
+
 ```typescript
 // API Middleware 检测到配额超限
 if (!rateLimitResult.allowed) {
@@ -1710,6 +1739,7 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 ```
 
 **输出示例**:
+
 ```
 > Ready! Your webhook signing secret is whsec_xxxxxxxxxxxxxxxxxxxxx
 > Listening for events matching webhook endpoint https://localhost:3000/api/webhooks/stripe
@@ -1845,12 +1875,12 @@ test.describe('Subscription Flow', () => {
 
 ### 8.4 Stripe 测试卡号
 
-| 卡号 | 用途 |
-|------|------|
+| 卡号                    | 用途                     |
+| ----------------------- | ------------------------ |
 | `4242 4242 4242 4242` | 支付成功（无 3D Secure） |
-| `4000 0025 0000 3155` | 需要 3D Secure 验证 |
-| `4000 0000 0000 9995` | 支付失败（余额不足） |
-| `4000 0000 0000 0002` | 支付失败（卡片被拒） |
+| `4000 0025 0000 3155` | 需要 3D Secure 验证      |
+| `4000 0000 0000 9995` | 支付失败（余额不足）     |
+| `4000 0000 0000 0002` | 支付失败（卡片被拒）     |
 
 **CVV**: 任意 3 位数字
 **有效期**: 任意未来日期
@@ -1866,23 +1896,23 @@ test.describe('Subscription Flow', () => {
 # .env.local
 
 # Stripe
-STRIPE_SECRET_KEY=sk_live_REDACTED
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_REDACTED
-STRIPE_WEBHOOK_SECRET=whsec_REDACTED
+STRIPE_SECRET_KEY=sk_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+STRIPE_WEBHOOK_SECRET=whsec_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 # Stripe Price IDs
-STRIPE_PRICE_ID_PRO_MONTHLY=price_xxxxxxxxxxxxxxxxxxxxxxxxx
-STRIPE_PRICE_ID_PRO_YEARLY=price_xxxxxxxxxxxxxxxxxxxxxxxxx
-STRIPE_PRICE_ID_ULTRA_MONTHLY=price_xxxxxxxxxxxxxxxxxxxxxxxxx
-STRIPE_PRICE_ID_ULTRA_YEARLY=price_xxxxxxxxxxxxxxxxxxxxxxxxx
+STRIPE_PRICE_ID_PRO_MONTHLY=price_XXXXXXXXXXXXXXXX
+STRIPE_PRICE_ID_PRO_YEARLY=price_XXXXXXXXXXXXXXXX
+STRIPE_PRICE_ID_ULTRA_MONTHLY=price_XXXXXXXXXXXXXXXX
+STRIPE_PRICE_ID_ULTRA_YEARLY=price_XXXXXXXXXXXXXXXX
 
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXXXXXXXXXXXXXX
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.XXXXXXXXXXXXXXXXXX
 
 # App URL
-NEXT_PUBLIC_APP_URL=https://cryptoquant.com
+NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
 ### 9.2 Stripe Dashboard 配置
@@ -1927,6 +1957,7 @@ supabase gen types typescript --local > lib/supabase/types.ts
 ```
 
 **迁移 SQL**:
+
 ```sql
 -- 创建 Stripe Webhook 事件日志表
 CREATE TABLE IF NOT EXISTS public.stripe_webhook_events (
@@ -2012,6 +2043,7 @@ GROUP BY sp.name;
 本方案提供了完整的 Stripe 订阅集成架构，包括：
 
 ### ✅ 核心功能
+
 - **Checkout 流程**: 从选择计划到支付成功的完整流程
 - **Webhook 处理**: 处理所有关键订阅事件
 - **订阅生命周期**: 创建、升级、降级、取消、续费
@@ -2019,6 +2051,7 @@ GROUP BY sp.name;
 - **错误处理**: 完善的容错机制和降级策略
 
 ### 🎯 实施要点
+
 1. **先在测试环境验证**：使用 Stripe CLI 本地测试所有流程
 2. **数据库迁移**: 创建 `stripe_webhook_events` 表
 3. **环境变量配置**: 确保所有 Price IDs 和 Secret Keys 正确
@@ -2026,6 +2059,7 @@ GROUP BY sp.name;
 5. **监控告警**: 定期检查 Webhook 日志和失败事件
 
 ### 📋 下一步行动
+
 - [ ] 运行 `scripts/setup-stripe-products.js` 创建产品
 - [ ] 应用数据库迁移（`stripe_webhook_events` 表）
 - [ ] 实现 Webhook Handler (`/app/api/webhooks/stripe/route.ts`)
